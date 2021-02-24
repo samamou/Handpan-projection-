@@ -1,0 +1,131 @@
+// https://p5js.org/reference/#/p5.FFT
+// https://stackoverflow.com/questions/53915390/p5-js-fourier-transform-of-mic-input-gives-no-output
+// https://p5js.org/reference/#/p5.Oscillator
+
+// https://www.openprocessing.org/sketch/1015276
+// +
+// https://www.openprocessing.org/sketch/979698
+
+let mic, fft, amp, osc;
+let Y = 0;
+const level_threshold = 90;
+let audioHistory = [];
+let numSamples = 800;
+let parts = [];
+
+
+function setup() {
+	// full page
+	createCanvas(windowWidth, windowHeight);
+
+	// start microphone
+	mic = new p5.AudioIn();
+	mic.start();
+
+	// Graphics
+	textAlign(CENTER);
+
+
+	// microphone -> FFT
+	fft = new p5.FFT(0.8, 4096);
+	fft.setInput(mic);
+
+	// sound synthesis
+	osc = new p5.Oscillator('s'); 
+  
+  
+    for(let i = 0;i < numSamples;i++)
+		audioHistory.push(0);
+	
+	for(let i=0;i < 1500;i++)
+	{
+		parts.push(new Particle());
+		
+	}
+}
+
+function draw() {
+  
+    //for particles 
+    blendMode(BLEND);
+	fill(0,50);
+	rect(0,0,windowWidth,windowHeight);
+	blendMode(ADD);
+	amp =mic.getLevel(1);
+	audioHistory.push(amp);
+  
+    if(audioHistory.length > numSamples)
+	    audioHistory.splice(0,1);
+	
+	for(let i=0;i < 500;i++)
+	 {
+	  parts[i].update();
+	  parts[i].display();
+	 }
+  
+	//backrgound color 
+    //returns a mapped number from one range to another 
+    //map(value, start1, stop1, start2, stop2, [withinBounds])
+	let a = map(Y/2, -100, 100, 50, 0);
+	background(a, a / 2, 50);
+
+	let f_max = -1; // frequency of highest peak?
+	let l_max = -1; // height of highest peak?
+
+
+	let spectr = fft.analyze();
+
+		for (let i = 0; i < spectr.length / 8; i++) { // attention : on ne trace pas tout le spectre
+			let intensity = spectr[i];
+
+			if (intensity > level_threshold && intensity > l_max) {
+				f_max = i;
+				l_max = intensity;
+			}
+		}
+
+  
+		if (f_max > -1) {
+			// nouvelle position du cercle
+           
+          
+            //The lerp function is convenient for creating motion along a straight path and for drawing dotted lines.
+            //lerp(start, stop, amt)
+			Y = constrain(lerp(Y, -400 * map(f_max, 20, 90, -1, 1), 0.1), -400, 400); 
+
+			// ajuster la fréquence du son généré
+			//osc.freq(map(Y, 400, -400, 100, 500), 0.1);
+		} else {
+			l_max = level_threshold;
+		}
+}
+
+
+class Particle
+{
+	constructor()
+	{
+		this.x = random(windowWidth);
+		this.y = random(windowHeight);
+		this.index = dist(this.x,this.y,windowWidth/2,windowHeight/2)*0.15;
+		this.index = int(map(this.index,0,max(windowWidth,windowHeight),(numSamples-1),0));
+		this.diam = 0;
+		this.v = 0;
+	}
+	update()
+	{
+		this.diam = map(audioHistory[this.index],0,1,25,500);
+		this.v = map(audioHistory[this.index],0,1,15,500);
+	}
+	display()
+	{
+		push(); //saves the current drawing style settings and transformations
+		
+        fill(this.v,this.v);
+		noStroke();
+		translate(this.x,this.y);
+		circle(0,0,this.diam);
+		
+        pop(); //restores original
+	}
+}
